@@ -51,7 +51,7 @@
 class DrmAdditionalHeader
 {
 public:
-    DrmAdditionalHeader() : empty{false} {}
+    DrmAdditionalHeader() : empty{false}, prefetchDeadline{-1.}, startTimestamp{-1.} {}
     bool empty; ///< If true it's the default structure, else it's the result of parsing
 
     std::string id; ///< The ID of this <drmAdditionalHeader> element. It is optional
@@ -59,6 +59,10 @@ public:
         /// Either the url attribute or the inline BASE64 header (but not both) must be specified.
     std::vector<uint8_t> data; ///< The raw DRM AdditionalHeader
     std::string drmContentId; ///< Undocumented
+
+    // F4M 3.0
+    float prefetchDeadline;
+    float startTimestamp;
 };
 
 /*! \brief The <dvrInfo> element represents all information needed to play DVR
@@ -92,13 +96,59 @@ public:
 class BootstrapInfo
 {
 public:
-    BootstrapInfo() : empty{false} {}
+    BootstrapInfo() : empty{false}, fragmentDuration{-1.}, segmentDuration{-1.} {}
     bool empty; ///< If true it's the default structure, else it's the result of parsing
 
     std::string id; ///< The ID of this <bootstrapInfo> element. It is optional.
     std::string profile; ///< The profile, or type of bootstrapping represented by this element. It is required. Usually "named"
     std::string url; ///< A URL to a file containing the raw bootstrap info.
     std::vector<uint8_t> data; ///< Raw bootstrap info
+
+    // 3.0
+    float fragmentDuration; ///< F4M 3.0 the 'ideal fragment duration', optional
+    float segmentDuration; ///< F4M 3.0 the 'ideal segment duration', optional
+};
+
+// F4M 3.0 only
+// Represent a single sample that maps a stream presentation time to a SMPTE time code.
+// It applies to stream-level manifests only.
+class SmpteTimecode
+{
+public:
+    SmpteTimecode() : timestamp{-1.0} {}
+    std::string smpte; // mandatory, format : “hour:minute:second:frame”
+    float timestamp; // mandatory, format : decimal number of seconds
+    std::string date; // optional, format : "YYYY-MM-DD"
+    std::string timezone; // optional, format : "[+/-]hh:mm"
+};
+
+// F4M 3.0 only
+// convey a splice, a sequence of time within the presentation where content may be inserted.
+// Essentially for helping the client to insert advertising content.
+class Cue
+{
+public:
+    Cue() : availNum{-1}, availsExpected{-1}, duration{-1.0}, time{-1.0} {}
+    int availNum; // optional, the index of the avail within the total set of avails for the program content.
+    int availsExpected; // optional, the expected total number of avails for the program content.
+    float duration; // mandatory, the splice duration, expressed as a decimal number of seconds.
+    std::string id; // mandatory, the ID of this <cue> element.
+    float time; // mandatory, the stream presentation time at which point the splice should occur, expressed as a decimal number of seconds.
+    std::string type; // mandatory, legal value : "spliceOut"
+    std::string programId; // optional, an identifier for the program content.
+};
+
+// F4M 3.0 only
+// contain information needed to enable best-effort fetch support on HTTP streamed media.
+// only set level, multiple instance possible : only one for an adaptive set
+// if id not present, apply to all medias
+// NOTE: only to consider if not in bootrapinfo
+class BestEffortFetchInfo
+{
+public:
+    std::string id; // optional
+    float fragmentDuration; // deprecated
+    float segmentDuration; // deprecated
 };
 
 /*! \brief The <media> element represents one representation of the piece of
@@ -127,7 +177,7 @@ public:
     std::string  drmAdditionalHeaderId; ///< The ID of a <drmAdditionalHeader> element. It is optional.
     DrmAdditionalHeader drmAdditionalHeader; ///< The drmAdditionalHeader associated with this media.
     bool alternate; ///< Indicate if this representation is an alternate version. Fixed value to true. It is optional.
-    std::string type; ///< The type for alternative track. Valid values include "audio+video", "video", "audio", "data" and "text". It is optional.
+    std::string type; ///< The type for alternative track. Valid values include "audio+video", "video", "audio", "data" and "text". It is optional. F4M 3.0 add the "video-keyframe-only" type.
     std::string label; ///< The description for alternative track. It is required only if the alternate attribute is present.
     std::string lang; ///< The language code for alternative track. It is required only if the alternate attribute is present.
     std::string groupspec; ///< The group specifier for multicast media. It is optional. Only with multicastStreamName and a RTMFP url.
@@ -136,6 +186,37 @@ public:
     std::vector<uint8_t> moov; ///< The <moov> element represents the Movie Box, or "moov" atom. F4M 1.0 only
     std::string dvrInfoId; ///< The ID of a <dvrInfo> element. F4M 1.0 only
     DvrInfo dvrInfo; ///< The dvrInfo associated with this media.
+
+    // 3.0
+    std::string audioCodec; ///< The audioCodec for alternative audio track. Only if the alternate attribute is present AND the type is audio. Follow RFC 6381 . Since F4M 3.0
+    std::string videoCodec; ///< ONLY valid if type is "video" or "video-keyframe-only" or "audio+video". Follow RFC6381. Since F4M 3.0.
+
+    std::string cueInfoId; ///< The ID of a <cueInfo> element
+    std::vector<Cue> cueInfo; ///< The collection of Cue associated with the media
+
+    std::string bestEffortFetchInfoId; ///< The ID of a <bestEffortFetchInfo> element
+    BestEffortFetchInfo bestEffortFetchInfo; ///< store 'ideal' fragment and segment duration, deprecated
+
+    std::string drmAdditionalHeaderSetId; ///< F4M 3.0, to link several drmAdditionalHeader to a media
+                                          ///< drmAdditionalHeaderId must not be present if this one is : exclusive
+    std::vector<DrmAdditionalHeader> drmAdditionalHeaderSet;
+
+    std::vector<SmpteTimecode> smpteTimeCodes; ///< F4M 3.0
+};
+
+// F4M 3.0
+// TODO: It just shows that the Manifest struct is not adapted for storing the manifest datas
+// Just implement it for now , even if it's broken, maybe it can help later.
+class AdaptiveSet
+{
+public:
+    // optionals, same definition as in Media, valid for every media in the set
+    bool alternate;
+    std::string audioCodec;
+    std::string label;
+    std::string lang;
+    std::string type;
+    std::vector<Media> medias;
 };
 
 /*! \brief The root element in the f4m document.
@@ -156,10 +237,16 @@ public:
         /// Valid values include "live", "recorded", and "liveOrRecorded". It is optional.
     std::string deliveryType; ///< The <deliveryType> element indicates the means by which content is delivered to the player.
         /// Valid values include "streaming" and "progressive". It is optional. If unspecified, it is inferred from the media protocol.
+    // the 'medias' here is what is called the 'implicit' adaptative set in the F4M 3.0 spec
     std::vector<Media> medias; ///< All the medias elements associated with parsed f4m file.
     std::string label; ///< The <label> element is a string representing the default user-friendly description of the media.
     std::string lang; ///< The <lang> element is a string representing the base language of the piece of media.
     std::string baseURL; ///< The <baseURL> element contains the base URL for all relative (HTTP-based) URLs in the manifest. It is optional.
+
+    //  3.0
+    std::vector<std::string> profiles; // F4M 3.0 spec (says 2.0) , defaut to "urn://profile.adobe.com/F4F", list of hds profiles supported, each separated by a space. URN as specified in [RFC2142]
+
+    std::vector<AdaptiveSet> adaptiveSets; ///< F4M 3.0 only : 'explicit' adaptive sets.
 };
 
 #endif // MANIFEST_H

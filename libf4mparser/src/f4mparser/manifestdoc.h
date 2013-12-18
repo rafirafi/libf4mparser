@@ -27,23 +27,56 @@
 #include <libxml/xpath.h>
 #include <string>
 
+
+// manage what is specific to the manifest (not to the media presentation)
+
 class ManifestDoc
 {
 public:
+    static const std::string m_nsF4mBase;
+
+    enum manifest_level_t {
+        UNKNOWN_LEVEL,
+        SLM_STREAM_LEVEL, // single-level manifest
+        MLM_SET_LEVEL, // multi-level set-level manifest
+        MLM_STREAM_LEVEL // multi-level stream-level manifest
+    };
+
+public:
     explicit ManifestDoc(std::string url);
     ~ManifestDoc();
-    friend class ManifestParser;
+
+    bool setVersion(std::string version);
+    int  versionMajor() const { return m_major; }
+    int  versionMinor() const { return m_minor; }
+
+    manifest_level_t manifestLevel() const { return m_manifestLevel; }
+    void setManifestLevel(manifest_level_t level) { m_manifestLevel = level; }
+
+    bool isSetLevel() { return m_manifestLevel == MLM_SET_LEVEL; }
+    bool isStreamLevel() { return m_manifestLevel == SLM_STREAM_LEVEL
+                || m_manifestLevel == MLM_STREAM_LEVEL; }
+    bool isSingleLevel() { return m_manifestLevel == SLM_STREAM_LEVEL; }
+    bool isMultiLevelStreamLevel() { return m_manifestLevel == MLM_STREAM_LEVEL; }
+
+    const std::string&  fileUrl() const { return m_fileUrl; }
+
+    xmlXPathContextPtr  xpathCtx() const  { return m_xpathCtx; }
+    void                setXpathCtx(xmlXPathContextPtr xpathCtx) { m_xpathCtx = xpathCtx; }
+
+    xmlDocPtr           doc() const { return m_doc; }
+    void                setDoc(xmlDocPtr xmlDoc) { m_doc = xmlDoc; }
+
 private:
     std::string m_fileUrl;
+
     xmlDocPtr m_doc;
     xmlXPathContextPtr m_xpathCtx;
-    const char *m_nsF4m;
-    bool m_isMultiLevelStreamLevel;
 
-    int getF4mVersion() const;
+    int m_major;
+    int m_minor;
 
-    static const char* const m_nsF4mVersion1;
-    static const char* const m_nsF4mVersion2;
+    manifest_level_t m_manifestLevel;
 };
 
 #endif // MANIFESTDOC_H

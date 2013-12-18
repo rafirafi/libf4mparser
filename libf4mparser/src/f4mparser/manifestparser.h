@@ -34,6 +34,8 @@
 
 #include "manifestdoc.h"
 
+#include <functional>
+
 class ManifestParser
 {
 private:
@@ -51,21 +53,42 @@ private:
 
     bool        initManifestParser();
     Manifest    parseManifest();
+    void        parseMLStreamManifests(Manifest *manifest);
+    void        parseMLStreamManifest(Manifest *manifest, Media &media);
+
     void        parseMedias(Manifest* manifest);
     void        parseDvrInfos(Manifest* manifest);
     void        parseDrmAdditionalHeaders(Manifest* manifest);
     void        parseBootstrapInfos(Manifest* manifest);
 
+    // F4M 3.0 only
+    void        parseSmpteTimeCodes(Manifest* manifest);
+    void        parseCueInfos(Manifest* manifest);
+    void        parseBestEffortFetchInfo(Manifest* manifest);
+    void        parseDrmAdditionalHeaderSet(Manifest* manifest);
+    void        parseAdaptiveSet(Manifest* manifest); 
+    void        getManifestProfiles(Manifest *manifest);
+
+    void        setManifestLevel(bool isMLMStreamLevel = false);
+    void        setManifestVersion(std::string ns);
+    void        forEachMedia(Manifest *manifest, std::function<void(Media&)> func);
+    bool        nodeIsInF4mNs(const xmlNodePtr node);
+
     std::string getNodeAttributeValueAsString(const xmlAttrPtr attribute);
-    int         getNodeAttributeValueAsInt(const xmlAttrPtr attribute);
-    float       getNodeAttributeValueAsFloat(const xmlAttrPtr attribute);
+    int         getNodeAttributeValueAsInt(const xmlAttrPtr attribute, bool *error = nullptr);
+    float       getNodeAttributeValueAsFloat(const xmlAttrPtr attribute, bool *error = nullptr);
 
     std::string getNodeContentAsString(const xmlNodePtr node);
-    int         getNodeContentAsInt(const xmlNodePtr node);
-    float       getNodeContentAsFloat(const xmlNodePtr node);
+    int         getNodeContentAsInt(const xmlNodePtr node, bool *error = nullptr);
+    float       getNodeContentAsFloat(const xmlNodePtr node, bool *error = nullptr);
 
     std::vector<uint8_t> getNodeBase64Data(const xmlNodePtr node);
-    bool        nodeIsInNsF4m(const xmlNodePtr node);
+
+    std::string sanitizeBaseUrl(const std::string &url);
+    static bool attrNameIs(xmlAttrPtr &attribute, const char *name);
+    static bool nodeNameIs(xmlNodePtr &node, const char *name);
+
+    bool        downloadF4mFile(std::vector<uint8_t> *response);
 };
 
 #endif // MANIFESTPARSER_H

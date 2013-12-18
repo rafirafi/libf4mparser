@@ -26,11 +26,11 @@
 #include <cstring> // strcmp
 
 // ns
-const char* const ManifestDoc::m_nsF4mVersion1 = "http://ns.adobe.com/f4m/1.0";
-const char* const ManifestDoc::m_nsF4mVersion2 = "http://ns.adobe.com/f4m/2.0";
+const std::string ManifestDoc::m_nsF4mBase("http://ns.adobe.com/f4m/");
 
 ManifestDoc::ManifestDoc(std::string url)
-    : m_fileUrl(url), m_doc{NULL}, m_xpathCtx{NULL}, m_nsF4m{nullptr}, m_isMultiLevelStreamLevel(false)
+    : m_fileUrl(url), m_doc{NULL}, m_xpathCtx{NULL},
+      m_major(0), m_minor(0), m_manifestLevel(UNKNOWN_LEVEL)
 {
 }
 
@@ -47,15 +47,26 @@ ManifestDoc::~ManifestDoc()
     xmlCleanupParser();
 }
 
-int ManifestDoc::getF4mVersion() const
+// the F4M 3.0 spec says only '1.0' '2.0' and '3.0' are legal
+bool ManifestDoc::setVersion(std::string version)
 {
-    if (!m_nsF4m) {
-        return -1;
+    bool ret = true;
+    int major = 1, minor = 0;
+    size_t pos;
+    if ((pos = version.find('.')) != std::string::npos) {
+        try { major = std::stoi(version.substr(0, pos)); } catch (...) {
+            major = 1;
+            ret = false;
+        }
+        try { minor = std::stoi(version.substr(pos + 1)); } catch (...) {
+            major = 1;
+            minor = 0;
+            ret = false;
+        }
+        m_major = major;
+        m_minor = minor;
+    } else {
+        ret = false;
     }
-    if (strcmp(m_nsF4m, m_nsF4mVersion2) == 0) {
-        return 2;
-    } else if (strcmp(m_nsF4m, m_nsF4mVersion1) == 0) {
-        return 1;
-    }
-    return -1;
+    return ret;
 }
