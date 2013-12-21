@@ -36,8 +36,7 @@
 #define F4M_DLOG(x) do { x } while(0)
 #endif
 
-// TODO : use errors fot number conversion
-// TODO check if it's safe to trim for every node/attribute values.
+// TODO : use number conversion error
 
 std::string ManifestParser::getNodeAttributeValueAsString(const xmlAttrPtr attribute)
 {
@@ -252,7 +251,6 @@ bool ManifestParser::downloadF4mFile(std::vector<uint8_t> *response)
     return true;
 }
 
-
 /*****************************************************************/
 /* not realy helpers, do some parsing  */
 /*****************************************************************/
@@ -265,15 +263,23 @@ void ManifestParser::setManifestLevel(bool isMLMStreamLevel)
     if (m_manifestDoc->versionMajor() < 2) {
         return m_manifestDoc->setManifestLevel(ManifestDoc::SLM_STREAM_LEVEL);
     }
+
     // check for href element
     const xmlChar *xpathExp = BAD_CAST("/nsf4m:manifest/nsf4m:media[@href]");
-    xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathExp, m_manifestDoc->xpathCtx());
+    const xmlChar *xpathExpV3 = BAD_CAST("/nsf4m:manifest/nsf4m:media[@href] | /nsf4m:manifest/nsf4m:adaptiveSet/nsf4m:media[@href]");
+    xmlXPathObjectPtr xpathObj = NULL;
+    if (m_manifestDoc->versionMajor() < 3) {
+        xpathObj = xmlXPathEvalExpression(xpathExp, m_manifestDoc->xpathCtx());
+    } else {
+        xpathObj = xmlXPathEvalExpression(xpathExpV3, m_manifestDoc->xpathCtx());
+    }
     if (xpathObj) {
         if (xpathObj->nodesetval && xpathObj->nodesetval->nodeNr) {
             return m_manifestDoc->setManifestLevel(ManifestDoc::MLM_SET_LEVEL);
         }
         xmlXPathFreeObject(xpathObj);
     }
+
     m_manifestDoc->setManifestLevel(ManifestDoc::SLM_STREAM_LEVEL);
 }
 

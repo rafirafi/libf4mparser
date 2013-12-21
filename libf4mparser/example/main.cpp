@@ -114,9 +114,9 @@ int main (int argc, char *argv[])
                 std::cerr << "no valid bootstrapinfo" << std::endl;
             }
             if (!media.metadata.empty()) {
-                std::cerr << "metadata size" << media.metadata.size() << std::endl;
+                std::cerr << "metadata size " << media.metadata.size() << std::endl;
             } else {
-                std::cerr << "no valid metadata" << media.metadata.size() << std::endl;
+                std::cerr << "no valid metadata" << std::endl;
             }
         }
     } else {

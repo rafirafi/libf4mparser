@@ -64,9 +64,9 @@ private:
     // F4M 3.0 only
     void        parseSmpteTimeCodes(Manifest* manifest);
     void        parseCueInfos(Manifest* manifest);
-    void        parseBestEffortFetchInfo(Manifest* manifest);
-    void        parseDrmAdditionalHeaderSet(Manifest* manifest);
-    void        parseAdaptiveSet(Manifest* manifest); 
+    void        parseBestEffortFetchInfos(Manifest* manifest);
+    void        parseDrmAdditionalHeaderSets(Manifest* manifest);
+    void        parseAdaptiveSets(Manifest* manifest);
     void        getManifestProfiles(Manifest *manifest);
 
     void        setManifestLevel(bool isMLMStreamLevel = false);
@@ -89,6 +89,8 @@ private:
     static bool nodeNameIs(xmlNodePtr &node, const char *name);
 
     bool        downloadF4mFile(std::vector<uint8_t> *response);
+
+    void printDebugMediaCheck(const Media &media);  // INFO
 };
 
 #endif // MANIFESTPARSER_H

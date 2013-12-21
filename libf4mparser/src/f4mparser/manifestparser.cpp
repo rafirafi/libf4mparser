@@ -37,14 +37,6 @@
 #define F4M_DLOG(x) do { x } while(0)
 #endif
 
-//16 Dec 2013 : I think parsing order is ok, retrieval of content is ok in itself,
-// globally for f4M spec < 3.0 it's usable
-// what to rework first :  - the way the info is stored (duplication+++), no easy way to know if an
-//                              element was present in the xml file
-//                          - some conditionnal may be wrong / don't respect spec 3.0
-// It can be interesting to rework the xsd shema in spec 3.0 to make it parsable by libxml2.
-
-
 ManifestParser::ManifestParser(void *downloadFileUserPtr, DOWNLOAD_FILE_FUNCTION downloadFileFctPtr)
     : m_downloadFileUserPtr(downloadFileUserPtr), m_downloadFileFctPtr(downloadFileFctPtr)
 {
@@ -88,8 +80,8 @@ bool ManifestParser::initManifestParser()
     }
     // response not empty : &response[0] defined
     m_manifestDoc->setDoc(xmlReadMemory(reinterpret_cast<const char *>(&response[0]),
-                                        static_cast<int>(response.size()),
-                                        "manifest.f4m", NULL, 0));
+                          static_cast<int>(response.size()),
+                          "manifest.f4m", NULL, 0));
     if (!m_manifestDoc->doc()) {
         F4M_DLOG(std::cerr << __func__ << " xmlReadMemory failed" << std::endl;);
         return false;
@@ -159,21 +151,36 @@ Manifest ManifestParser::parseManifest()
                         manifest.duration = getNodeContentAsFloat(node);
                     }
                     // report element we don't parse
-                    else if (nodeNameIs(node, "media")
-                             && nodeNameIs(node, "bootstrapInfo")
-                             && nodeNameIs(node, "dvrInfo")
-                             && nodeNameIs(node, "drmAdditionalHeader")
-                             && nodeNameIs(node, "smpteTimecodes")
-                             && nodeNameIs(node, "cueInfo")
-                             && nodeNameIs(node, "bestEffortFetchInfo")
-                             && nodeNameIs(node, "drmAdditionalHeaderSet")
-                             && nodeNameIs(node, "adaptiveSet")) {
+                    else if ((nodeNameIs(node, "media")
+                              || nodeNameIs(node, "bootstrapInfo")
+                              || nodeNameIs(node, "dvrInfo")
+                              || nodeNameIs(node, "drmAdditionalHeader")
+                              || nodeNameIs(node, "smpteTimecodes")
+                              || nodeNameIs(node, "cueInfo")
+                              || nodeNameIs(node, "bestEffortFetchInfo")
+                              || nodeNameIs(node, "drmAdditionalHeaderSet")
+                              || nodeNameIs(node, "adaptiveSet")) == false) {
                         F4M_DLOG(std::cerr << __func__ <<  " : node : ["
                                  << (const char *)node->name << "] ignored" << std::endl;);
                         getNodeContentAsString(node);
                     }
                 }
             }
+        }
+
+        if (!manifest.deliveryType.empty() && manifest.deliveryType != "streaming"
+                && manifest.deliveryType != "progressive") {
+            F4M_DLOG(std::cerr << __func__ <<  "deliveryType invalid "
+                     << manifest.deliveryType << std::endl;);
+            manifest.deliveryType.clear();  // 'streaming' is the one used in practice
+        }
+
+        if (!manifest.streamType.empty() && manifest.streamType != "live"
+                && manifest.streamType != "recorded"
+                && manifest.streamType != "liveOrRecorded") {
+            F4M_DLOG(std::cerr << __func__ <<  "streamType invalid "
+                     << manifest.streamType << std::endl;);
+            manifest.streamType.clear();  // or fallback to default "liveOrRecorded"
         }
 
         if (manifest.baseURL.empty()) {
@@ -185,29 +192,29 @@ Manifest ManifestParser::parseManifest()
 
     parseMedias(&manifest);
 
-    if (m_manifestDoc->versionMajor() >= 3 && m_manifestDoc->isMultiLevelStreamLevel() == false) {
-        parseAdaptiveSet(&manifest);
+    if (m_manifestDoc->versionMajor() >= 3
+            && m_manifestDoc->isMultiLevelStreamLevel() == false) {
+        parseAdaptiveSets(&manifest);
     }
 
     if (m_manifestDoc->isMultiLevelStreamLevel() == false) {
         parseDvrInfos(&manifest);
     }
 
-    parseDrmAdditionalHeaders(&manifest);
-
-    parseBootstrapInfos(&manifest);
+    if (m_manifestDoc->isSetLevel() == false) {
+        parseDrmAdditionalHeaders(&manifest);
+        parseBootstrapInfos(&manifest);
+    }
 
     if (m_manifestDoc->versionMajor() >= 3 ) {
         if (m_manifestDoc->isSetLevel() == false) {
             parseSmpteTimeCodes(&manifest);
             parseCueInfos(&manifest);
+            parseDrmAdditionalHeaderSets(&manifest);
         }
-
         if (m_manifestDoc->isSetLevel() == true) {
-            parseBestEffortFetchInfo(&manifest);
+            parseBestEffortFetchInfos(&manifest);
         }
-
-        parseDrmAdditionalHeaderSet(&manifest);
     }
 
     return manifest;
@@ -260,15 +267,95 @@ void ManifestParser::parseMLStreamManifest(Manifest *manifest, Media &media)
     }
 
     // pass the dvrInfo to the media
-    // TODO find a better way to do this
     subManifest.medias.at(0).dvrInfo = media.dvrInfo;
 
     // replace media
     media = subManifest.medias.at(0);
 
-    // TODO: F4M 3.0 not really sure how to deal with profiles
+    // push profiles to main manifest
     for (auto profile : subManifest.profiles) {
         manifest->profiles.push_back(profile);
+    }
+}
+
+void ManifestParser::printDebugMediaCheck(const Media &media)
+{
+    if (m_manifestDoc->isSetLevel()) {
+        if (!media.bootstrapInfoId.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " bootstrapInfoId present in a set level manifest" <<std::endl;);
+        }
+        if (!media.drmAdditionalHeaderId.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " drmAdditionalHeaderId present in a set level manifest" <<std::endl;);
+        }
+        if (!media.url.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " url present in a set level manifest" <<std::endl;);
+        }
+        if (m_manifestDoc->versionMajor() >= 3) {
+            if (!media.cueInfoId.empty()) {
+                F4M_DLOG(std::cerr << __func__
+                         << " cueInfoId present in a set level manifest" <<std::endl;);
+            }
+            if (!media.drmAdditionalHeaderSetId.empty()) {
+                F4M_DLOG(std::cerr << __func__
+                         << " drmAdditionalHeaderSetId present in a set level manifest" <<std::endl;);
+            }
+        }
+    }
+    if (m_manifestDoc->isMultiLevelStreamLevel()) {
+        if (media.alternate == true) {
+            F4M_DLOG(std::cerr << __func__
+                     << " alternate present in a stream level manifest" <<std::endl;);
+        }
+        if (!media.bitrate.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " bitrate present in a stream level manifest" <<std::endl;);
+        }
+        if (media.height >= 0) {
+            F4M_DLOG(std::cerr << __func__
+                     << " height present in a stream level manifest" <<std::endl;);
+        }
+        if (media.width >= 0) {
+            F4M_DLOG(std::cerr << __func__
+                     << " width present in a stream level manifest" <<std::endl;);
+        }
+        if (!media.href.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " href present in a stream level manifest" <<std::endl;);
+        }
+        if (!media.label.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " label present in a stream level manifest" <<std::endl;);
+        }
+        if (!media.lang.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " lang present in a stream level manifest" <<std::endl;);
+        }
+        if (!media.streamId.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " streamId present in a stream level manifest" <<std::endl;);
+        }
+        if (!media.type.empty()) {
+            F4M_DLOG(std::cerr << __func__
+                     << " type present in a stream level manifest" <<std::endl;);
+        }
+
+        if (m_manifestDoc->versionMajor() >= 3) {
+            if (!media.audioCodec.empty()) {
+                F4M_DLOG(std::cerr << __func__
+                         << " audioCodec present in a stream level manifest" <<std::endl;);
+            }
+            if (!media.videoCodec.empty()) {
+                F4M_DLOG(std::cerr << __func__
+                         << " videoCodec present in a stream level manifest" <<std::endl;);
+            }
+            if (!media.bestEffortFetchInfoId.empty()) {
+                F4M_DLOG(std::cerr << __func__
+                         << " bestEffortFetchInfoId present in a stream level manifest" <<std::endl;);
+            }
+        }
     }
 }
 
@@ -403,31 +490,54 @@ void ManifestParser::parseMedias(Manifest* manifest)
                     }
                 }
 
-                // check
+                // check rtmfp
                 if (!media.groupspec.empty() || !media.multicastStreamName.empty()) {
                     if ((media.groupspec.empty() != media.multicastStreamName.empty()) ||
                             UrlUtils::haveRtmfpScheme(media.url) == false) {
-                        F4M_DLOG(std::cerr << __func__ << " multicast for rtmfp not valid " <<std::endl;);
+                        F4M_DLOG(std::cerr << __func__ << " multicast for rtmfp not valid " << std::endl;);
                         continue;
                     }
                 }
 
+                // check media type
+                if (!media.type.empty()
+                        && media.type != "audio"
+                        && media.type != "audio+video"
+                        && media.type != "data"
+                        && media.type != "text"
+                        && media.type != "video"
+                        && !(m_manifestDoc->versionMajor() >= 3
+                             && media.type == "video-keyframe-only")) {
+                    F4M_DLOG(std::cerr << __func__ << " invalid media type "
+                             << media.type << std::endl;);
+                    media.type.clear(); // default to "audio+video"
+                }
+
+                // malformed manifest
                 if (m_manifestDoc->versionMajor() >= 3) {
-                    // TODO : discard 'videoCodec' if 'type' is not ok
+                    if (!media.videoCodec.empty() && (!media.type.empty()  && media.type != "video"
+                                                      && media.type != "audio+video"
+                                                      && media.type != "video-keyframe-only")) {
+                        F4M_DLOG(std::cerr << __func__ << " videoCodec " << media.videoCodec
+                                 << " present with media type " << media.type
+                                 << std::endl;);
+                        media.videoCodec.clear();
+                    }
 
                     if (!media.drmAdditionalHeaderId.empty() && !media.drmAdditionalHeaderSetId.empty()) {
                         F4M_DLOG(std::cerr << __func__
                                  << " both drmAdditionalHeaderId and drmAdditionalHeaderSetId are present"
                                  <<std::endl;);
-                        // TODO: ?
                     }
                 }
+
+                printDebugMediaCheck(media);  // INFO
 
                 // push to manifest
                 manifest->medias.push_back(media);
 
                 // Only one if we're in a multi-level stream-level
-                if (m_manifestDoc->isMultiLevelStreamLevel() == true) {
+                if (m_manifestDoc->isMultiLevelStreamLevel()) {
                     break;
                 }
             }
@@ -469,7 +579,6 @@ void ManifestParser::parseBootstrapInfos(Manifest *manifest)
                         }
                     }
 
-                    // TODO: separate by version cleanly
                     else if (m_manifestDoc->versionMajor() >= 3
                              && attrNameIs(attr, "fragmentDuration")) {
                         bootstrapInfo.fragmentDuration = getNodeAttributeValueAsFloat(attr);
@@ -491,10 +600,8 @@ void ManifestParser::parseBootstrapInfos(Manifest *manifest)
                              << std::endl;);
                     continue;
                 }
-
                 if (bootstrapInfo.url.empty()) {
                     bootstrapInfo.data = getNodeBase64Data(node);
-                    // check
                     if (bootstrapInfo.data.empty()) {
                         F4M_DLOG(std::cerr << __func__ << " ignoring malformed bootstrap : no data"
                                  << std::endl;);
@@ -564,8 +671,6 @@ void ManifestParser::parseSmpteTimeCodes(Manifest *manifest)
                 }
 
                 // TODO: check formats, check that timestamp is increasing
-
-                // to manifest
 
                 auto assign = [&](Media media) {
                     media.smpteTimeCodes.push_back(smpteTimeCode);
@@ -683,8 +788,7 @@ void ManifestParser::parseCueInfos(Manifest *manifest)
     }
 }
 
-// TODO: to consider only if not available from bootstrapInfo
-void ManifestParser::parseBestEffortFetchInfo(Manifest *manifest)
+void ManifestParser::parseBestEffortFetchInfos(Manifest *manifest)
 {
     const xmlChar *xpathExp = BAD_CAST("/nsf4m:manifest/nsf4m:bestEffortFetchInfo");
     xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathExp, m_manifestDoc->xpathCtx());
@@ -723,11 +827,20 @@ void ManifestParser::parseBestEffortFetchInfo(Manifest *manifest)
                     }
                 }
 
+                // info
+                if (xpathObj->nodesetval->nodeNr > 1 && bestEffortFetchInfo.id.empty()) {
+                    F4M_DLOG(std::cerr << __func__ <<  " several bestEffortFetchInfo but no id" << std::endl;);
+                }
+
                 auto assign = [&](Media media) {
                     if (media.bestEffortFetchInfoId.empty() ||
                             media.bestEffortFetchInfoId == bestEffortFetchInfo.id ||
                             bestEffortFetchInfo.id.empty()) {
-                        media.bestEffortFetchInfo = bestEffortFetchInfo;
+                        // consider only if not set in bootstrapInfo
+                        if (media.bootstrapInfo.fragmentDuration < 0
+                                &&  media.bootstrapInfo.segmentDuration < 0) {
+                            media.bestEffortFetchInfo = bestEffortFetchInfo;
+                        }
                     }
                 };
                 forEachMedia(manifest, assign);
@@ -738,7 +851,7 @@ void ManifestParser::parseBestEffortFetchInfo(Manifest *manifest)
     }
 }
 
-void ManifestParser::parseDrmAdditionalHeaderSet(Manifest *manifest)
+void ManifestParser::parseDrmAdditionalHeaderSets(Manifest *manifest)
 {
     const xmlChar *xpathExp = BAD_CAST("/nsf4m:manifest/nsf4m:drmAdditionalHeaderSet");
     xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathExp, m_manifestDoc->xpathCtx());
@@ -783,8 +896,6 @@ void ManifestParser::parseDrmAdditionalHeaderSet(Manifest *manifest)
                                 }
                                 if (attrNameIs(attr, "id")) {
                                     drmAdditionalHeader.id = getNodeAttributeValueAsString(attr);
-                                } else if (attrNameIs(attr, "drmContentId")) {
-                                    drmAdditionalHeader.drmContentId = getNodeAttributeValueAsString(attr);
                                 }
                                 // only in Set
                                 else if (attrNameIs(attr, "prefetchDeadline")) {
@@ -816,6 +927,7 @@ void ManifestParser::parseDrmAdditionalHeaderSet(Manifest *manifest)
                             }
 
                             // TODO: check
+
                             dAHs.push_back(drmAdditionalHeader);
                         }
                     }
@@ -834,8 +946,7 @@ void ManifestParser::parseDrmAdditionalHeaderSet(Manifest *manifest)
 }
 
 // for now just duplicate parseMedias code
-// I'll see if I can get the whole manifest parsing accurate later
-void ManifestParser::parseAdaptiveSet(Manifest *manifest)
+void ManifestParser::parseAdaptiveSets(Manifest *manifest)
 {
     const xmlChar *xpathExp = BAD_CAST("/nsf4m:manifest/nsf4m:adaptiveSet");
     xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathExp, m_manifestDoc->xpathCtx());
@@ -851,7 +962,6 @@ void ManifestParser::parseAdaptiveSet(Manifest *manifest)
                     continue;
                 }
 
-                // process each set : it means get the children and group them together
                 bool alternate = false;
                 std::string audioCodec;
                 std::string label;
@@ -875,8 +985,7 @@ void ManifestParser::parseAdaptiveSet(Manifest *manifest)
                         continue;
                     } {
                         F4M_DLOG(std::cerr << __func__ << " ignoring adaptiveSet attr "
-                                 << (const char *)attr->name
-                                 << std::endl;);
+                                 << (const char *)attr->name << std::endl;);
                     }
                 }
 
@@ -948,7 +1057,7 @@ void ManifestParser::parseAdaptiveSet(Manifest *manifest)
                             }
                         }
 
-                        // get metadat if here
+                        // get metadata
                         for (xmlNodePtr lchild = child->children; lchild != NULL; lchild = lchild->next) {
                             // check we don't escape ns
                             if (lchild->type == XML_ELEMENT_NODE && nodeIsInF4mNs(lchild) && lchild->name) {
@@ -963,14 +1072,8 @@ void ManifestParser::parseAdaptiveSet(Manifest *manifest)
                     }
                 }
 
-                // then push adaptiveSet to manifest
+                // push adaptiveSet to manifest
                 AdaptiveSet aSet;
-                aSet.alternate = alternate;
-                aSet.label = label;
-                aSet.lang = lang;
-                aSet.audioCodec = audioCodec;
-                aSet.type = type;
-                aSet.medias = medias;
                 manifest->adaptiveSets.push_back(aSet);
             }
         }
@@ -1073,9 +1176,7 @@ void ManifestParser::parseDrmAdditionalHeaders(Manifest *manifest)
                     }
                     if (attrNameIs(attr, "id")) {
                         drmAdditionalHeader.id = getNodeAttributeValueAsString(attr);
-                    } else if (attrNameIs(attr, "drmContentId")) {
-                        drmAdditionalHeader.drmContentId = getNodeAttributeValueAsString(attr);
-                    } else if (attrNameIs(attr, "url")) {
+                    }  else if (attrNameIs(attr, "url")) {
                         drmAdditionalHeader.url = getNodeAttributeValueAsString(attr);
                         if (UrlUtils::isAbsolute(drmAdditionalHeader.url) == false) {
                             drmAdditionalHeader.url.insert(0, manifest->baseURL + "/");
@@ -1154,8 +1255,8 @@ bool ManifestParser::updateDvrInfo(void *downloadFileUserPtr,
         goto fail;
     }
 
-    // get xml file : I'm not sure for authority, set it to false
-    response = downloadFileFctPtr(downloadFileUserPtr, url, status );
+    // get xml file
+    response = downloadFileFctPtr(downloadFileUserPtr, url, status);
     if (status != 200 || response.empty()) {
         response.clear();
         F4M_DLOG(std::cerr << __func__ << " get dvrInfo failed with status " << status << std::endl;);
@@ -1166,7 +1267,7 @@ bool ManifestParser::updateDvrInfo(void *downloadFileUserPtr,
     // get xml doc
     // response not empty : &response[0] defined
     doc = xmlReadMemory(reinterpret_cast<const char *>(&response[0]),
-                        (int)response.size(), "manifest.f4m", NULL, 0);
+            (int)response.size(), "manifest.f4m", NULL, 0);
     if (!doc) {
         F4M_DLOG(std::cerr << __func__ << " xmlReadMemory failed" << std::endl;);
         goto fail;

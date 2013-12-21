@@ -47,7 +47,7 @@ ManifestDoc::~ManifestDoc()
     xmlCleanupParser();
 }
 
-// the F4M 3.0 spec says only '1.0' '2.0' and '3.0' are legal
+// the F4M 3.0 spec says only '1.0' '2.0' and '3.0' values are valid
 bool ManifestDoc::setVersion(std::string version)
 {
     bool ret = true;
