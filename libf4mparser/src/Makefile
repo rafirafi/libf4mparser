@@ -1,8 +1,8 @@
 
 CXX = g++
 #CPPFLAGS = -DF4M_DEBUG
-CXXFLAGS = -fPIC -Wall -Wextra -std=c++11 -fvisibility=hidden $(shell pkg-config --cflags libxml-2.0)
-LDFLAGS = $(shell pkg-config --libs libxml-2.0) -shared
+CXXFLAGS = -fPIC -Wall -Wextra -std=c++11 -fvisibility=hidden
+LDFLAGS = -lpugixml -shared
 RM = rm -f
 TARGET_LIB = libf4mparser.so
 

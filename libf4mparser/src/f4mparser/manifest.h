@@ -59,8 +59,8 @@ public:
         /// Either the url attribute or the inline BASE64 header (but not both) must be specified.
     std::vector<uint8_t> data; ///< The raw DRM AdditionalHeader
 
-    float prefetchDeadline; ///< Since F4M 3.0
-    float startTimestamp; ///< Since F4M 3.0
+    double prefetchDeadline; ///< Since F4M 3.0
+    double startTimestamp; ///< Since F4M 3.0
 };
 
 /*! \brief The <dvrInfo> element represents all information needed to play DVR
@@ -102,8 +102,8 @@ public:
     std::string url; ///< A URL to a file containing the raw bootstrap info.
     std::vector<uint8_t> data; ///< Raw bootstrap info
 
-    float fragmentDuration; ///< F4M 3.0 the 'ideal fragment duration', optional
-    float segmentDuration; ///< F4M 3.0 the 'ideal segment duration', optional
+    double fragmentDuration; ///< F4M 3.0 the 'ideal fragment duration', optional
+    double segmentDuration; ///< F4M 3.0 the 'ideal segment duration', optional
 };
 
 /*! \brief Represent a single sample that maps a stream presentation time to a SMPTE time code.
@@ -115,7 +115,7 @@ class SmpteTimecode
 public:
     SmpteTimecode() : timestamp{-1.0} {}
     std::string smpte; ///< mandatory, format : “hour:minute:second:frame”
-    float timestamp; ///< mandatory, format : decimal number of seconds
+    double timestamp; ///< mandatory, format : decimal number of seconds
     std::string date; ///< optional, format : "YYYY-MM-DD"
     std::string timezone; ///< optional, format : "[+/-]hh:mm"
 };
@@ -130,9 +130,9 @@ public:
     Cue() : availNum{-1}, availsExpected{-1}, duration{-1.0}, time{-1.0} {}
     int availNum; ///<  optional, the index of the avail within the total set of avails for the program content.
     int availsExpected; ///<  optional, the expected total number of avails for the program content.
-    float duration; ///<  mandatory, the splice duration, expressed as a decimal number of seconds.
+    double duration; ///<  mandatory, the splice duration, expressed as a decimal number of seconds.
     std::string id; ///<  mandatory, the ID of this <cue> element.
-    float time; ///<  mandatory, the stream presentation time at which point the splice should occur, expressed as a decimal number of seconds.
+    double time; ///<  mandatory, the stream presentation time at which point the splice should occur, expressed as a decimal number of seconds.
     std::string type; ///<  mandatory, legal value : "spliceOut"
     std::string programId; ///<  optional, an identifier for the program content.
 };
@@ -150,8 +150,8 @@ public:
     bool empty;
 
     std::string id; ///<  optional
-    float fragmentDuration; ///<  deprecated
-    float segmentDuration; ///<  deprecated
+    double fragmentDuration; ///<  deprecated
+    double segmentDuration; ///<  deprecated
 };
 
 /*! \brief The <media> element represents one representation of the piece of
@@ -227,7 +227,7 @@ public:
     Manifest() : duration{-1.} {}
 
     std::string id; ///< The <id> element represents a unique identifier for the media. It is optional.
-    float duration; ///< The <duration> element represents the duration of the media, in seconds. Usually for live content, it is 0. It is optional.
+    double duration; ///< The <duration> element represents the duration of the media, in seconds. Usually for live content, it is 0. It is optional.
     std::string startTime; ///< The <startTime> element represents the date/time at which the media was
         /// first (or will first be) made available. It is optional.
     std::string mimeType; ///< The <mimeType> element represents the MIME type of the media file. It is optional.

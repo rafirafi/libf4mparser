@@ -24,9 +24,16 @@
 #ifndef MANIFESTDOC_H
 #define MANIFESTDOC_H
 
-#include <libxml/xpath.h>
 #include <string>
+#include <vector>
 
+#include <pugixml.hpp>
+
+namespace pugi {
+// stripped from an old version of pugixml
+// temporary workaround till I figure something
+const char_t* namespace_uri(const xml_node& node);
+}
 
 // manage what is specific to the manifest (not to the media presentation)
 
@@ -61,22 +68,23 @@ public:
 
     const std::string&  fileUrl() const { return m_fileUrl; }
 
-    xmlXPathContextPtr  xpathCtx() const  { return m_xpathCtx; }
-    void                setXpathCtx(xmlXPathContextPtr xpathCtx) { m_xpathCtx = xpathCtx; }
+    pugi::xml_document& doc() { return m_doc; }
+    bool                setXmlDoc(std::vector<uint8_t> rawDoc);
 
-    xmlDocPtr           doc() const { return m_doc; }
-    void                setDoc(xmlDocPtr xmlDoc) { m_doc = xmlDoc; }
+    std::string         rootNs();
+    std::string         selectNs();
 
 private:
     std::string m_fileUrl;
 
-    xmlDocPtr m_doc;
-    xmlXPathContextPtr m_xpathCtx;
+    pugi::xml_document m_doc;
+    std::vector<uint8_t> m_xmlRawBuffer; // hods the buffer for pugixml
 
     int m_major;
     int m_minor;
 
     manifest_level_t m_manifestLevel;
+
 };
 
 #endif // MANIFESTDOC_H

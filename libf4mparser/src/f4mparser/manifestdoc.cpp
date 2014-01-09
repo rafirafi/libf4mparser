@@ -21,30 +21,53 @@
  *
  ***************************************************************************/
 
-#include "manifestparser.h"
+#include "manifestdoc.h"
 
-#include <cstring> // strcmp
+#include <cstring> // strchr
+
+#ifndef F4M_DEBUG
+#define F4M_DLOG(x)
+#else
+#include <iostream>  // std::cerr
+#define F4M_DLOG(x) do { x } while(0)
+#endif
+
+namespace pugi {
+// stripped from an old version of pugixml
+// temporary workaround till I figure something
+const char_t* namespace_uri(const xml_node& node)
+{
+    const char_t* pos = /*find_char*/strchr(node.name(), ':');
+    string_t ns = PUGIXML_TEXT("xmlns");
+    if (pos) {
+        ns += ':';
+        ns.append(node.name(), pos);
+    }
+
+    xml_node p = node;
+
+    while (p) {
+        xml_attribute a = p.attribute(ns.c_str());
+
+        if (a) return a.value();
+
+        p = p.parent();
+    }
+
+    return PUGIXML_TEXT("");
+}
+}
 
 // ns
 const std::string ManifestDoc::m_nsF4mBase("http://ns.adobe.com/f4m/");
 
 ManifestDoc::ManifestDoc(std::string url)
-    : m_fileUrl(url), m_doc{NULL}, m_xpathCtx{NULL},
-      m_major(0), m_minor(0), m_manifestLevel(UNKNOWN_LEVEL)
+    : m_fileUrl(url), m_major(0), m_minor(0), m_manifestLevel(UNKNOWN_LEVEL)
 {
 }
 
 ManifestDoc::~ManifestDoc()
 {
-    if (m_doc) {
-        xmlFreeDoc(m_doc);
-        m_doc = NULL;
-    }
-    if (m_xpathCtx) {
-        xmlXPathFreeContext(m_xpathCtx);
-        m_xpathCtx = NULL;
-    }
-    xmlCleanupParser();
 }
 
 // the F4M 3.0 spec says only '1.0' '2.0' and '3.0' values are valid
@@ -69,4 +92,32 @@ bool ManifestDoc::setVersion(std::string version)
         ret = false;
     }
     return ret;
+}
+
+std::string ManifestDoc::rootNs()
+{
+    return m_doc.child("manifest").attribute("xmlns").value();
+}
+
+std::string ManifestDoc::selectNs()
+{
+    static std::string res;
+    if (res.empty()) {
+        res = "[namespace-uri()='" + rootNs() + "']";
+    }
+    return res;
+}
+
+bool ManifestDoc::setXmlDoc(std::vector<uint8_t> rawDoc)
+{
+    // set the raw buffer
+    m_xmlRawBuffer = std::move(rawDoc);
+
+    pugi::xml_parse_result result = m_doc.load_buffer_inplace(m_xmlRawBuffer.data(), m_xmlRawBuffer.size());
+    if (!result) {
+        F4M_DLOG(std::cerr << __func__ << " Error description: " << result.description() << "\n";);
+        return false;
+    }
+
+    return true;
 }
