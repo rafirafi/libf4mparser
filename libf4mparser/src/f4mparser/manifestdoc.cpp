@@ -101,11 +101,7 @@ std::string ManifestDoc::rootNs()
 
 std::string ManifestDoc::selectNs()
 {
-    static std::string res;
-    if (res.empty()) {
-        res = "[namespace-uri()='" + rootNs() + "']";
-    }
-    return res;
+        return std::string("[namespace-uri()='" + rootNs() + "']");
 }
 
 bool ManifestDoc::setXmlDoc(std::vector<uint8_t> rawDoc)
