@@ -529,6 +529,7 @@ void ManifestParser::parseAdaptiveSets(Manifest *manifest)
 
         // push adaptiveSet to manifest
         AdaptiveSet aSet;
+        aSet.medias = medias;
         manifest->adaptiveSets.push_back(aSet);
     }
 
