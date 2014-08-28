@@ -438,6 +438,9 @@ void ManifestParser::parseAdaptiveSets(Manifest *manifest)
             } else if (attrNameIs(attr, "label")) {
                 label = getAttrValueAsString(attr);
                 continue;
+            } else if (attrNameIs(attr, "audioCodec")) {
+                lang = getAttrValueAsString(attr);
+                continue;
             } else if (attrNameIs(attr, "lang")) {
                 lang = getAttrValueAsString(attr);
                 continue;
