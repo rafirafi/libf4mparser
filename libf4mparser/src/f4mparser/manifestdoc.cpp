@@ -32,32 +32,6 @@
 #define F4M_DLOG(x) do { x } while(0)
 #endif
 
-namespace pugi {
-// stripped from an old version of pugixml
-// temporary workaround till I figure something
-const char_t* namespace_uri(const xml_node& node)
-{
-    const char_t* pos = /*find_char*/strchr(node.name(), ':');
-    string_t ns = PUGIXML_TEXT("xmlns");
-    if (pos) {
-        ns += ':';
-        ns.append(node.name(), pos);
-    }
-
-    xml_node p = node;
-
-    while (p) {
-        xml_attribute a = p.attribute(ns.c_str());
-
-        if (a) return a.value();
-
-        p = p.parent();
-    }
-
-    return PUGIXML_TEXT("");
-}
-}
-
 // ns
 const std::string ManifestDoc::m_nsF4mBase("http://ns.adobe.com/f4m/");
 

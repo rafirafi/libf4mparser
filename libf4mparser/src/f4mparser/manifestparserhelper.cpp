@@ -99,9 +99,9 @@ void ManifestParser::getManifestProfiles(Manifest *manifest)
 
 bool ManifestParser::nodeIsInF4mNs(const pugi::xml_node &node)
 {
-    return std::string{pugi::/*impl::*/namespace_uri(node)}.compare(0,
-                                                   ManifestDoc::m_nsF4mBase.size(),
-                                                   ManifestDoc::m_nsF4mBase) == 0;
+    return std::string{pugi::xpath_query("namespace-uri()")
+                .evaluate_string(node)}
+    .compare(0, ManifestDoc::m_nsF4mBase.size(), ManifestDoc::m_nsF4mBase) == 0;
 }
 
 // ! don't change size of medias in 'func'
