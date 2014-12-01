@@ -29,12 +29,6 @@
 
 #include <pugixml.hpp>
 
-namespace pugi {
-// stripped from an old version of pugixml
-// temporary workaround till I figure something
-const char_t* namespace_uri(const xml_node& node);
-}
-
 // manage what is specific to the manifest (not to the media presentation)
 
 class ManifestDoc
